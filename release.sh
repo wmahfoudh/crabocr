@@ -10,8 +10,8 @@ mkdir -p $DEST
 mkdir -p $DEST/tessdata
 
 cp target/release/crabocr $DEST/
-if [ -f tessdata/eng.traineddata ]; then
-    cp tessdata/eng.traineddata $DEST/tessdata/
+if [ -d tessdata ]; then
+    cp tessdata/* $DEST/tessdata/ 2>/dev/null || true
 fi
 cp README.md $DEST/ 2>/dev/null || true
 cp LICENSE $DEST/ 2>/dev/null || true
