@@ -1,14 +1,24 @@
+# Build artifacts
 /target
 **/*.rs.bk
-Cargo.lock
-/models/*.onnx
+
+# Generated libraries
 /lib/*.a
 /lib/*.so
 /lib/*.dylib
 
+# Downloaded tarballs (if any remain)
+*.tar.gz
 
-# Added by cargo
-#
-# already existing elements were commented out
+# Test artifacts
+test.pdf
+test_output.txt
 
-#/target
+# Editor/System
+.DS_Store
+.vscode
+.idea
+*.swp
+
+# We keep vendor/ and tessdata/ for self-containment as requested by the nature of the project (static build), 
+# unless we move to a script-based setup. For now, we commit matches standard "vendor everything" for C deps in Rust sometimes.
