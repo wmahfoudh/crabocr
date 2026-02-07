@@ -18,11 +18,11 @@ Unlike traditional tools, CrabOCR is built to be:
 
 ### Static Binary (Recommended for Linux)
 
-You can download the latest static binary from the [Releases page](https://github.com/wmahfoudh/crabocr/releases) or build it yourself using Docker.
+You can download the latest static binary from the [Releases page](https://github.com/wmahfoudh/crabocr/releases). Alternatively, you can build it yourself either locally or using Docker (see [Building from Source](#building-from-source)).
 
 ### Docker Image
 
-We provide a Dockerfile to build a minimal, statically linked binary.
+A Dockerfile is provided to build a minimal, statically linked binary.
 
 ```bash
 # Build the image
@@ -65,7 +65,15 @@ CrabOCR requires Tesseract trained data files (`.traineddata`).
 
 **Where does it look?**
 The program searches for a `tessdata` directory in the following order:
-1.  **`TESSDATA_PREFIX` Environment Variable**: If set, it checks this path first.
+1.  **`TESSDATA_PREFIX` Environment Variable**:
+    *   **Linux/macOS**:
+        ```bash
+        export TESSDATA_PREFIX=/path/to/your/tessdata_folder
+        ```
+    *   **Windows (PowerShell)**:
+        ```powershell
+        $env:TESSDATA_PREFIX = "C:\path\to\tessdata_folder"
+        ```
 2.  **Relative to Binary**: It looks for a `tessdata` folder in the same directory as the `crabocr` executable.
 3.  **Current Working Directory**: It looks for a `tessdata` folder in your current directory.
 
@@ -115,6 +123,16 @@ docker rm -v $id
 # 3. Verify
 ./crabocr --help
 ```
+
+### Compiling on Windows
+
+Since this project relies on `make` and C-dependencies that are complex to build natively on Windows, **we strongly recommend using WSL2 (Windows Subsystem for Linux)** or Docker.
+
+**Using WSL2:**
+1.  Install WSL2 (`wsl --install`).
+2.  Open your Ubuntu/Debian terminal.
+3.  Follow the **Local Build (Linux)** instructions above.
+
 
 ## License
 
