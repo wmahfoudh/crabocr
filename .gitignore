@@ -5,3 +5,10 @@ Cargo.lock
 /lib/*.a
 /lib/*.so
 /lib/*.dylib
+
+
+# Added by cargo
+#
+# already existing elements were commented out
+
+#/target

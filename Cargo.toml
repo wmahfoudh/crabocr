@@ -1,6 +1,21 @@
 [package]
 name = "crabocr"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+authors = ["DeepMind Agent"]
+description = "A high-performance PDF-to-text converter designed for LLM ingestion and stateless FaaS runtimes."
 
 [dependencies]
+clap = { version = "4.4", features = ["derive"] }
+thiserror = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tempfile = "3.8"
+log = "0.4"
+libc = "0.2"
+
+[build-dependencies]
+bindgen = "0.69"
+cc = "1.0"
+cmake = "0.1"
