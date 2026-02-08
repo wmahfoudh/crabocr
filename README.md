@@ -1,6 +1,6 @@
 # CrabOCR
 
-**CrabOCR** is a high-performance, PDF-to-text converter designed specifically for LLM ingestion pipelines. It rund locally, uses **MuPDF** for rendering and **Tesseract** for optical character recognition, and produces UTF-8 text output from scanned documents or complex PDF layouts. 
+**CrabOCR** is a high-performance, PDF-to-text converter designed specifically for LLM ingestion pipelines. It runs locally, uses **MuPDF** for rendering and **Tesseract** for optical character recognition, and produces UTF-8 text output from scanned documents or complex PDF layouts. 
 
 ## Context
 
