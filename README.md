@@ -1,24 +1,29 @@
 # CrabOCR
 
-**CrabOCR** is a high-performance, stateless PDF-to-text converter designed specifically for LLM ingestion pipelines. It leverages **MuPDF** for precise rendering and **Tesseract** for optical character recognition, producing clean UTF-8 text output from scanned documents and complex PDF layouts.
+**CrabOCR** is a high-performance, stateless PDF-to-text converter designed specifically for LLM ingestion pipelines. It uses **MuPDF** for rendering and **Tesseract** for optical character recognition, and produces UTF-8 text output from scanned documents or complex PDF layouts. 
 
-Unlike traditional tools, CrabOCR is built to be:
+## Context
+
+CrabOCR idea came after repeatedly hitting PDF extraction failures in **automation workflows** like n8n or Power Automate. Due to the complexity of the PDF format and the million features it can hide, traditional text extraction is inherently fragile. For LLM pipelines, consistent extraction matters more than perfect text; modern language models excel at interpreting noisy OCR output, but the flow will fail completely when a PDF can't be processed.
+
+CrabOCR is built to be:
 *   **Stateless & Pipe-friendly**: Reads from stdin, writes to stdout. Perfect for containerized environments and Unix pipelines.
-*   **Statically Linked**: Distribued as a single, dependency-free binary (Linux/Musl).
+*   **Statically Linked**: Distribued as a single, dependency-free binary (Linux/Musl). Can be used in a cloud function.
 *   **Fast**: Uses direct C-API bindings to MuPDF and Tesseract, avoiding shell-out overhead.
+*   **Consistent**: No Surprises, it renders all PDFs to images before OCR. Lower quality than text extraction (when text layers exist), but works consistently on any PDF, scanned, e-signed, encrypted, or malformed.
 
 ## Features
 
 *   **PDF to Text**: Converts scanned and native PDFs to plain text.
 *   **Standard Input/Output**: Seamless integration with other tools (e.g., `cat doc.pdf | crabocr | llm-ingest`).
-*   **Zero Runtime Dependencies**: The static binary runs on any modern Linux distro (Arch, Alpine, Debian, Ubuntu, etc.) without installing separate libraries.
+*   **Zero Runtime Dependencies**: The static binary runs on any modern Linux distro. Should build on Windows (not tested).
 *   **Configurable**: Control OCR language and rendering DPI via CLI arguments.
 
 ## Installation
 
 ### Static Binary (Recommended for Linux)
 
-You can download the latest static binary from the [Releases page](https://github.com/wmahfoudh/crabocr/releases). Alternatively, you can build it yourself either locally or using Docker (see [Building from Source](#building-from-source)).
+You can download the latest static linux binary from the [Releases page](https://github.com/wmahfoudh/crabocr/releases). Alternatively, you can build it yourself either locally or using Docker (see [Building from Source](#building-from-source)).
 
 ### Docker Image
 
@@ -137,9 +142,8 @@ Since this project relies on `make` and C-dependencies that are complex to build
 ## License
 
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
-This is required because we statically link against **MuPDF**, which is AGPL licensed.
 
-**Note:** If you use this software as part of a network service, you must make the source code available to users of that service.
+**Note:** If you use CrabOCR as part of a network service, you must make the source code available.
 
 ## Acknowledgements
 
