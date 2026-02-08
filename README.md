@@ -1,6 +1,6 @@
 # CrabOCR
 
-**CrabOCR** is a high-performance, stateless PDF-to-text converter designed specifically for LLM ingestion pipelines. It uses **MuPDF** for rendering and **Tesseract** for optical character recognition, and produces UTF-8 text output from scanned documents or complex PDF layouts. 
+**CrabOCR** is a high-performance, PDF-to-text converter designed specifically for LLM ingestion pipelines. It rund locally, uses **MuPDF** for rendering and **Tesseract** for optical character recognition, and produces UTF-8 text output from scanned documents or complex PDF layouts. 
 
 ## Context
 
@@ -8,7 +8,7 @@ CrabOCR idea came after repeatedly hitting PDF extraction failures in **automati
 
 CrabOCR is built to be:
 *   **Stateless & Pipe-friendly**: Reads from stdin, writes to stdout. Perfect for containerized environments and Unix pipelines.
-*   **Statically Linked**: Distribued as a single, dependency-free binary (Linux/Musl). Can be used in a cloud function.
+*   **Self-Contained**: Statically Linked and distribued as a single, dependency-free binary. Processes everything locally without external API calls or cloud services. No usage limits, no network required.
 *   **Fast**: Uses direct C-API bindings to MuPDF and Tesseract, avoiding shell-out overhead.
 *   **Consistent**: No Surprises, it renders all PDFs to images before OCR. Lower quality than text extraction (when text layers exist), but works consistently on any PDF, scanned, e-signed, encrypted, or malformed.
 
