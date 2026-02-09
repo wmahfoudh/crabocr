@@ -1,6 +1,6 @@
 # CrabOCR
 
-**CrabOCR** is a high-performance, PDF-to-text converter designed specifically for LLM ingestion pipelines. It runs locally, uses **MuPDF** for rendering and **Tesseract** for optical character recognition, and produces UTF-8 text output from scanned documents or complex PDF layouts. 
+**CrabOCR** is a high-performance, PDF-to-text converter designed specifically for LLM ingestion pipelines. It runs locally, uses **MuPDF** for rendering, **Tesseract** for optical character recognition, and produces UTF-8 text output from scanned documents or complex PDF layouts. 
 
 ## Context
 
@@ -128,16 +128,6 @@ docker rm -v $id
 # 3. Verify
 ./crabocr --help
 ```
-
-### Compiling on Windows
-
-Since this project relies on `make` and C-dependencies that are complex to build natively on Windows, **we strongly recommend using WSL2 (Windows Subsystem for Linux)** or Docker.
-
-**Using WSL2:**
-1.  Install WSL2 (`wsl --install`).
-2.  Open your Ubuntu/Debian terminal.
-3.  Follow the **Local Build (Linux)** instructions above.
-
 
 ## License
 
