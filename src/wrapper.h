@@ -1,4 +1,5 @@
 #include "mupdf/fitz.h"
+#include "mupdf/pdf.h"
 
 typedef struct {
   fz_context *ctx;
@@ -39,3 +40,10 @@ int my_pixmap_width(fz_context *ctx, fz_pixmap *pix);
 int my_pixmap_height(fz_context *ctx, fz_pixmap *pix);
 int my_pixmap_stride(fz_context *ctx, fz_pixmap *pix);
 int my_pixmap_n(fz_context *ctx, fz_pixmap *pix);
+
+// XFA extraction
+// Returns dynamically allocated UTF-8 string, or NULL if no XFA data.
+// Caller must free with my_free_xfa(). len_out receives string length.
+char *my_extract_xfa(fz_context *ctx, fz_document *doc, size_t *len_out,
+                     char *err_out, size_t err_len);
+void my_free_xfa(fz_context *ctx, char *xfa_data);

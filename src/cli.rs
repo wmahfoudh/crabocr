@@ -19,4 +19,8 @@ pub struct Cli {
     /// Enable verbose logging to STDERR.
     #[arg(short, long)]
     pub verbose: bool,
+
+    /// XFA-only mode. Extract XFA XML data and exit without OCR.
+    #[arg(short = 'x', long)]
+    pub xfa: bool,
 }

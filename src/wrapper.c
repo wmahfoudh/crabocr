@@ -109,3 +109,86 @@ int my_pixmap_n(fz_context *ctx, fz_pixmap *pix) {
   (void)ctx;
   return pix->n;
 }
+
+char *my_extract_xfa(fz_context *ctx, fz_document *doc, size_t *len_out,
+                     char *err_out, size_t err_len) {
+  if (!ctx || !doc || !len_out)
+    return NULL;
+
+  *len_out = 0;
+  char *volatile result = NULL;
+
+  fz_try(ctx) {
+    // Check if this is a PDF document
+    pdf_document *pdoc = pdf_specifics(ctx, doc);
+    if (!pdoc) {
+      // Not a PDF, no XFA possible
+      return NULL;
+    }
+
+    // Navigate: trailer -> Root -> AcroForm -> XFA
+    pdf_obj *trailer = pdf_trailer(ctx, pdoc);
+    if (!trailer)
+      break;
+
+    pdf_obj *root = pdf_dict_gets(ctx, trailer, "Root");
+    if (!root)
+      break;
+
+    pdf_obj *acroform = pdf_dict_gets(ctx, root, "AcroForm");
+    if (!acroform)
+      break;
+
+    pdf_obj *xfa = pdf_dict_gets(ctx, acroform, "XFA");
+    if (!xfa)
+      break;
+
+    // XFA can be either a stream or an array of [name, stream] pairs
+    fz_buffer *combined = fz_new_buffer(ctx, 1024);
+
+    if (pdf_is_stream(ctx, xfa)) {
+      // Single stream
+      fz_buffer *buf = pdf_load_stream(ctx, xfa);
+      fz_append_buffer(ctx, combined, buf);
+      fz_drop_buffer(ctx, buf);
+    } else if (pdf_is_array(ctx, xfa)) {
+      // Array of [name, stream, name, stream, ...]
+      int len = pdf_array_len(ctx, xfa);
+      for (int i = 1; i < len;
+           i += 2) { // Start at 1 to get streams (0 is name)
+        pdf_obj *stream_obj = pdf_array_get(ctx, xfa, i);
+        if (pdf_is_stream(ctx, stream_obj)) {
+          fz_buffer *buf = pdf_load_stream(ctx, stream_obj);
+          fz_append_buffer(ctx, combined, buf);
+          fz_drop_buffer(ctx, buf);
+        }
+      }
+    }
+
+    // Extract data from buffer
+    unsigned char *data = NULL;
+    size_t data_len = fz_buffer_extract(ctx, combined, &data);
+    fz_drop_buffer(ctx, combined);
+
+    if (data_len > 0 && data != NULL) {
+      // Ensure null termination for string
+      result = fz_malloc(ctx, data_len + 1);
+      memcpy(result, data, data_len);
+      result[data_len] = '\0';
+      *len_out = data_len;
+    }
+    fz_free(ctx, data);
+  }
+  fz_catch(ctx) {
+    if (err_out)
+      strncpy(err_out, fz_caught_message(ctx), err_len - 1);
+    return NULL;
+  }
+
+  return result;
+}
+
+void my_free_xfa(fz_context *ctx, char *xfa_data) {
+  if (ctx && xfa_data)
+    fz_free(ctx, xfa_data);
+}

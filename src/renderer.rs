@@ -88,6 +88,36 @@ impl Renderer {
     }
     
     // Safety check helper
+    
+    /// Extract XFA XML data from the document if present.
+    /// Returns None if no XFA data exists.
+    pub fn extract_xfa(&self, doc: &Document) -> Option<String> {
+        unsafe {
+            let mut len: usize = 0;
+            let mut err_buf = [0i8; 256];
+            
+            let xfa_ptr = my_extract_xfa(
+                self.ctx,
+                doc.doc,
+                &mut len,
+                err_buf.as_mut_ptr(),
+                err_buf.len(),
+            );
+            
+            if xfa_ptr.is_null() || len == 0 {
+                return None;
+            }
+            
+            // Copy to Rust String before freeing C memory
+            let slice = std::slice::from_raw_parts(xfa_ptr as *const u8, len);
+            let result = String::from_utf8_lossy(slice).into_owned();
+            
+            // Free the C-allocated memory
+            my_free_xfa(self.ctx, xfa_ptr);
+            
+            Some(result)
+        }
+    }
 
 }
 

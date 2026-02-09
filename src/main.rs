@@ -26,8 +26,8 @@ fn run() -> Result<(), CrabError> {
     // Initialize logging
     logging::init(args.verbose);
 
-    // Validate DPI
-    if args.dpi < 72 || args.dpi > 600 {
+    // Validate DPI (only needed for OCR mode)
+    if !args.xfa && (args.dpi < 72 || args.dpi > 600) {
         return Err(CrabError::Cli(format!(
             "DPI must be between 72 and 600. Got: {}",
             args.dpi
@@ -43,23 +43,10 @@ fn run() -> Result<(), CrabError> {
             InputSource::StdinBytes(b) => eprintln!("Mode: StdinBytes({} bytes)", b.len()),
             InputSource::TempFile(f) => eprintln!("Mode: TempFile({:?})", f.path()),
         }
-        eprintln!("Config: lang='{}', dpi={}", args.lang, args.dpi);
+        eprintln!("Config: lang='{}', dpi={}, xfa_only={}", args.lang, args.dpi, args.xfa);
     }
     
-    // Initialize OCR
-    let ocr = ocr::Ocr::new(&args.lang)?;
-    if args.verbose {
-        eprintln!("OCR initialized with lang '{}'.", args.lang);
-    }
-    
-    // Open Document
-    // For now, only handle File or TempFile paths.
-    // StdinBytes -> write to temp file?
-    // In InputSource::new, we already handled potential large stdin.
-    // If small stdin, we have bytes. MuPDF needs file path (or we implement open_from_memory).
-    // For simplicity, let's write StdinBytes to a temp file if not empty.
-    
-    // Initialize Renderer
+    // Initialize Renderer (needed for both XFA extraction and OCR)
     let renderer = Renderer::new()?;
     if args.verbose {
         eprintln!("Renderer initialized.");
@@ -80,13 +67,41 @@ fn run() -> Result<(), CrabError> {
     };
 
     let mut doc = renderer.open(&final_path)?;
-    let page_count = renderer.page_count(&doc)?;
     
     if args.verbose {
+        let page_count = renderer.page_count(&doc)?;
         eprintln!("Opened document: {:?} ({} pages)", final_path, page_count);
     }
     
-    // Render pages
+    // XFA Extraction (Pre-OCR)
+    let xfa_data = renderer.extract_xfa(&doc);
+    
+    if args.xfa {
+        // XFA-only mode: print raw XML and exit
+        if let Some(xml) = xfa_data {
+            print!("{}", xml);
+        }
+        // Exit without OCR (no output if no XFA)
+        doc.drop_with(&renderer);
+        return Ok(());
+    }
+    
+    // Hybrid mode (default): print XFA with delimiters if present
+    if let Some(ref xml) = xfa_data {
+        println!("--- XFA DATA START ---");
+        print!("{}", xml);
+        println!("--- XFA DATA END ---");
+    }
+    
+    // Initialize OCR (deferred to avoid loading Tesseract in XFA-only mode)
+    let ocr = ocr::Ocr::new(&args.lang)?;
+    if args.verbose {
+        eprintln!("OCR initialized with lang '{}'.", args.lang);
+    }
+    
+    let page_count = renderer.page_count(&doc)?;
+    
+    // Render and OCR pages
     for i in 0..page_count {
         // 1. Render
         let mut pix = renderer.render_page(&doc, i, args.dpi as i32)?;
@@ -116,3 +131,4 @@ fn run() -> Result<(), CrabError> {
     
     Ok(())
 }
+
