@@ -73,15 +73,15 @@ Arguments:
   [FILE]  Input PDF or Image file. If not provided, reads from STDIN
 
 Options:
-  -m, --mode <MODE>  Extraction mode [default: hybrid] [values: hybrid, text, ocr]
-  -l, --lang <LANG>  Tesseract language code(s) [default: eng]
-  -r, --range <RNG>  Page range to process (e.g., "1-5", "1,3,10"). Default is all pages.
-  -t, --timeout <SEC> Global timeout in seconds. Exits with code 2 if exceeded.
-  -d, --dpi <DPI>    DPI for rasterization (used in ocr/hybrid modes) [default: 300]
-  -v, --verbose      Enable verbose logging to STDERR
-  -x, --xfa <XFA>    XFA extraction mode [default: clean] [values: off, raw, full, clean]
-  -h, --help         Print help
-  -V, --version      Print version
+  -m, --mode <MODE>     Extraction mode [default: hybrid] [values: hybrid, text, ocr]
+  -l, --lang <LANG>     Tesseract language code(s) [default: eng]
+  -r, --range <RNG>     Page range to process (e.g., "1-5", "1,3,10"). Default is all pages.
+  -t, --timeout <SEC>   Global timeout in seconds. Exits with code 2 if exceeded.
+  -d, --dpi <DPI>       DPI for rasterization (used in ocr/hybrid modes) [default: 300]
+  -v, --verbose         Enable verbose logging to STDERR
+  -x, --xfa <XFA>       XFA extraction mode [default: clean] [values: off, raw, full, clean]
+  -h, --help            Print help
+  -V, --version         Print version
 ```
 
 ### Example Workflows
