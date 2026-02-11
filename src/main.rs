@@ -4,9 +4,10 @@ mod ocr;
 mod cli;
 mod errors;
 mod input;
+mod xfa;
 
 use clap::Parser;
-use cli::Cli;
+use cli::{Cli, XfaMode, OcrMode};
 use errors::CrabError;
 use input::InputSource;
 use renderer::Renderer;
@@ -26,8 +27,15 @@ fn run() -> Result<(), CrabError> {
     // Initialize logging
     logging::init(args.verbose);
 
+    // Safety Guard: Check if both modes are disabled
+    if args.xfa == XfaMode::Off && args.ocr == OcrMode::Off {
+        eprintln!("Error: Both XFA and OCR modes are disabled. Nothing to process.");
+        // We can either return a specific error code or just Cli error
+        return Err(CrabError::Cli("Both XFA and OCR modes are disabled.".to_string()));
+    }
+
     // Validate DPI (only needed for OCR mode)
-    if !args.xfa && (args.dpi < 72 || args.dpi > 600) {
+    if args.ocr == OcrMode::On && (args.dpi < 72 || args.dpi > 600) {
         return Err(CrabError::Cli(format!(
             "DPI must be between 72 and 600. Got: {}",
             args.dpi
@@ -43,7 +51,7 @@ fn run() -> Result<(), CrabError> {
             InputSource::StdinBytes(b) => eprintln!("Mode: StdinBytes({} bytes)", b.len()),
             InputSource::TempFile(f) => eprintln!("Mode: TempFile({:?})", f.path()),
         }
-        eprintln!("Config: lang='{}', dpi={}, xfa_only={}", args.lang, args.dpi, args.xfa);
+        eprintln!("Config: lang='{}', dpi={}, xfa={:?}, ocr={:?}", args.lang, args.dpi, args.xfa, args.ocr);
     }
     
     // Initialize Renderer (needed for both XFA extraction and OCR)
@@ -73,27 +81,50 @@ fn run() -> Result<(), CrabError> {
         eprintln!("Opened document: {:?} ({} pages)", final_path, page_count);
     }
     
-    // XFA Extraction (Pre-OCR)
-    let xfa_data = renderer.extract_xfa(&doc);
+    // XFA Extraction
+    let xfa_data = if args.xfa != XfaMode::Off {
+        renderer.extract_xfa(&doc)
+    } else {
+        None
+    };
     
-    if args.xfa {
-        // XFA-only mode: print raw XML and exit
-        if let Some(xml) = xfa_data {
-            print!("{}", xml);
+    if let Some(ref xml) = xfa_data {
+        let print_delimiters = args.ocr == OcrMode::On;
+        
+        if print_delimiters {
+            println!("--- XFA DATA START ---");
         }
-        // Exit without OCR (no output if no XFA)
+        
+        match args.xfa {
+            XfaMode::Off => {}, // Should not be reached given the check above
+            XfaMode::Raw => print!("{}", xml),
+            XfaMode::Full | XfaMode::Clean => {
+                let data_only = args.xfa == XfaMode::Clean;
+                match xfa::xfa_xml_to_json(xml, data_only) {
+                    Ok(json) => print!("{}", json),
+                    Err(e) => {
+                        eprintln!("Warning: Failed to parse XFA content to structured JSON: {}", e);
+                        eprintln!("Fallback: Outputting raw XFA XML.");
+                        print!("{}", xml);
+                    }
+                }
+            }
+        }
+
+        if print_delimiters {
+            println!("\n--- XFA DATA END ---");
+            if args.ocr == OcrMode::On {
+                println!(); // Blank line before OCR output
+            }
+        }
+    }
+
+    if args.ocr == OcrMode::Off {
         doc.drop_with(&renderer);
         return Ok(());
     }
     
-    // Hybrid mode (default): print XFA with delimiters if present
-    if let Some(ref xml) = xfa_data {
-        println!("--- XFA DATA START ---");
-        print!("{}", xml);
-        println!("--- XFA DATA END ---");
-    }
-    
-    // Initialize OCR (deferred to avoid loading Tesseract in XFA-only mode)
+    // Initialize OCR
     let ocr = ocr::Ocr::new(&args.lang)?;
     if args.verbose {
         eprintln!("OCR initialized with lang '{}'.", args.lang);

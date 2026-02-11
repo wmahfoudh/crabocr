@@ -20,7 +20,31 @@ pub struct Cli {
     #[arg(short, long)]
     pub verbose: bool,
 
-    /// XFA-only mode. Extract XFA XML data and exit without OCR.
-    #[arg(short = 'x', long)]
-    pub xfa: bool,
+    /// XFA extraction mode.
+    #[arg(short = 'x', long, value_enum, default_value_t = XfaMode::Clean)]
+    pub xfa: XfaMode,
+
+    /// OCR mode.
+    #[arg(short = 'o', long, value_enum, default_value_t = OcrMode::On)]
+    pub ocr: OcrMode,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug, PartialEq)]
+pub enum XfaMode {
+    /// Skip XFA processing.
+    Off,
+    /// Output original XFA XML.
+    Raw,
+    /// Output full parsed JSON.
+    Full,
+    /// Output cleaned form-data JSON.
+    Clean,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug, PartialEq)]
+pub enum OcrMode {
+    /// Perform rendering and OCR.
+    On,
+    /// Skip rendering and OCR.
+    Off,
 }

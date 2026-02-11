@@ -1,9 +1,9 @@
 [package]
 name = "crabocr"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
-authors = ["DeepMind Agent"]
-description = "A high-performance PDF-to-text converter designed for LLM ingestion and stateless FaaS runtimes."
+authors = ["Walid Mahfoudh"]
+description = "High-performance PDF-to-text OCR and Adobe XFA data extractor."
 
 [dependencies]
 clap = { version = "4.4", features = ["derive"] }
@@ -14,6 +14,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tempfile = "3.8"
 log = "0.4"
 libc = "0.2"
+roxmltree = "0.20"
+serde_json = "1.0"
 
 [build-dependencies]
 bindgen = "0.69"
