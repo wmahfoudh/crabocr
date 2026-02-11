@@ -119,6 +119,32 @@ impl Renderer {
         }
     }
 
+    /// Extract structured text from a page.
+    pub fn extract_text(&self, doc: &Document, page_number: i32) -> Result<String, CrabError> {
+        unsafe {
+            let mut err_buf = [0i8; 256];
+            let text_ptr = my_extract_text(
+                self.ctx,
+                doc.doc,
+                page_number,
+                err_buf.as_mut_ptr(),
+                err_buf.len(),
+            );
+
+            if text_ptr.is_null() {
+                 let err_msg = std::ffi::CStr::from_ptr(err_buf.as_ptr()).to_string_lossy().into_owned();
+                 return Err(CrabError::Pdf(format!("Failed to extract text from page {}: {}", page_number, err_msg)));
+            }
+
+            let c_str = std::ffi::CStr::from_ptr(text_ptr);
+            let text = c_str.to_string_lossy().into_owned();
+            
+            my_free_text(self.ctx, text_ptr);
+            
+            Ok(text)
+        }
+    }
+
 }
 
 impl Drop for Renderer {

@@ -7,12 +7,13 @@ mod input;
 mod xfa;
 
 use clap::Parser;
-use cli::{Cli, XfaMode, OcrMode};
+use cli::{Cli, XfaMode, Mode};
 use errors::CrabError;
 use input::InputSource;
 use renderer::Renderer;
 use std::process;
-
+use std::time::Instant;
+use std::io::Write; // For flushing stdout
 
 fn main() {
     if let Err(e) = run() {
@@ -27,15 +28,8 @@ fn run() -> Result<(), CrabError> {
     // Initialize logging
     logging::init(args.verbose);
 
-    // Safety Guard: Check if both modes are disabled
-    if args.xfa == XfaMode::Off && args.ocr == OcrMode::Off {
-        eprintln!("Error: Both XFA and OCR modes are disabled. Nothing to process.");
-        // We can either return a specific error code or just Cli error
-        return Err(CrabError::Cli("Both XFA and OCR modes are disabled.".to_string()));
-    }
-
-    // Validate DPI (only needed for OCR mode)
-    if args.ocr == OcrMode::On && (args.dpi < 72 || args.dpi > 600) {
+    // Validate DPI (only needed if OCR is involved? Actually good to validate anyway)
+    if (args.mode == Mode::Ocr || args.mode == Mode::Hybrid) && (args.dpi < 72 || args.dpi > 600) {
         return Err(CrabError::Cli(format!(
             "DPI must be between 72 and 600. Got: {}",
             args.dpi
@@ -51,10 +45,11 @@ fn run() -> Result<(), CrabError> {
             InputSource::StdinBytes(b) => eprintln!("Mode: StdinBytes({} bytes)", b.len()),
             InputSource::TempFile(f) => eprintln!("Mode: TempFile({:?})", f.path()),
         }
-        eprintln!("Config: lang='{}', dpi={}, xfa={:?}, ocr={:?}", args.lang, args.dpi, args.xfa, args.ocr);
+        eprintln!("Config: lang='{}', dpi={}, xfa={:?}, mode={:?}, range='{}', timeout={}", 
+            args.lang, args.dpi, args.xfa, args.mode, args.range, args.timeout);
     }
     
-    // Initialize Renderer (needed for both XFA extraction and OCR)
+    // Initialize Renderer
     let renderer = Renderer::new()?;
     if args.verbose {
         eprintln!("Renderer initialized.");
@@ -65,7 +60,6 @@ fn run() -> Result<(), CrabError> {
         InputSource::File(p) => p.clone(),
         InputSource::TempFile(f) => f.path().to_path_buf(),
         InputSource::StdinBytes(b) => {
-             use std::io::Write;
              let mut t = tempfile::NamedTempFile::new()?;
              t.write_all(b)?;
              let p = t.path().to_path_buf();
@@ -75,86 +69,99 @@ fn run() -> Result<(), CrabError> {
     };
 
     let mut doc = renderer.open(&final_path)?;
+    let page_count = renderer.page_count(&doc)?;
     
     if args.verbose {
-        let page_count = renderer.page_count(&doc)?;
         eprintln!("Opened document: {:?} ({} pages)", final_path, page_count);
     }
     
     // XFA Extraction
-    let xfa_data = if args.xfa != XfaMode::Off {
-        renderer.extract_xfa(&doc)
-    } else {
-        None
-    };
-    
-    if let Some(ref xml) = xfa_data {
-        let print_delimiters = args.ocr == OcrMode::On;
-        
-        if print_delimiters {
+    if args.xfa != XfaMode::Off {
+        if let Some(xml) = renderer.extract_xfa(&doc) {
             println!("--- XFA DATA START ---");
-        }
-        
-        match args.xfa {
-            XfaMode::Off => {}, // Should not be reached given the check above
-            XfaMode::Raw => print!("{}", xml),
-            XfaMode::Full | XfaMode::Clean => {
-                let data_only = args.xfa == XfaMode::Clean;
-                match xfa::xfa_xml_to_json(xml, data_only) {
-                    Ok(json) => print!("{}", json),
-                    Err(e) => {
-                        eprintln!("Warning: Failed to parse XFA content to structured JSON: {}", e);
-                        eprintln!("Fallback: Outputting raw XFA XML.");
-                        print!("{}", xml);
+            
+            match args.xfa {
+                XfaMode::Off => {}, 
+                XfaMode::Raw => print!("{}", xml),
+                XfaMode::Full | XfaMode::Clean => {
+                    let data_only = args.xfa == XfaMode::Clean;
+                    match xfa::xfa_xml_to_json(&xml, data_only) {
+                        Ok(json) => print!("{}", json),
+                        Err(e) => {
+                            eprintln!("Warning: Failed to parse XFA content to structured JSON: {}", e);
+                            eprintln!("Fallback: Outputting raw XFA XML.");
+                            print!("{}", xml);
+                        }
                     }
                 }
             }
-        }
-
-        if print_delimiters {
             println!("\n--- XFA DATA END ---");
-            if args.ocr == OcrMode::On {
-                println!(); // Blank line before OCR output
-            }
+            println!(); // Blank line between sections
         }
     }
 
-    if args.ocr == OcrMode::Off {
-        doc.drop_with(&renderer);
-        return Ok(());
-    }
+    // Parse Range
+    let pages_to_process = cli::parse_range(&args.range, page_count as usize)
+        .map_err(|e| CrabError::Cli(format!("Invalid range: {}", e)))?;
     
-    // Initialize OCR
-    let ocr = ocr::Ocr::new(&args.lang)?;
     if args.verbose {
-        eprintln!("OCR initialized with lang '{}'.", args.lang);
+        eprintln!("Processing {} pages: {:?}", pages_to_process.len(), pages_to_process);
     }
-    
-    let page_count = renderer.page_count(&doc)?;
-    
-    // Render and OCR pages
-    for i in 0..page_count {
-        // 1. Render
-        let mut pix = renderer.render_page(&doc, i, args.dpi as i32)?;
-        
-        // Safety check (optional, but good practice)
+
+    // Initialize OCR if needed
+    let ocr = if args.mode == Mode::Ocr || args.mode == Mode::Hybrid {
+        let ocr_instance = ocr::Ocr::new(&args.lang)?;
         if args.verbose {
-             // eprintln!("Page {}: {}x{} ...", i, pix.width(&renderer), pix.height(&renderer));
+            eprintln!("OCR initialized with lang '{}'.", args.lang);
+        }
+        Some(ocr_instance)
+    } else {
+        None
+    };
+
+    // Execution Loop
+    let start_time = Instant::now();
+
+    for &page_idx in &pages_to_process {
+        // Timeout handling
+        if args.timeout > 0 && start_time.elapsed().as_secs() > args.timeout {
+             std::io::stdout().flush().ok(); // Flush stdout before error
+             eprintln!("Error: Process timed out");
+             process::exit(2);
         }
 
-        // 2. OCR
-        let text = ocr.recognize(&pix, &renderer)?;
-        
-        // 3. Output
-        print!("{}", text);
-        
-        // 4. Separator (between pages)
-        if i < page_count - 1 {
-            print!("\n\x0c\n"); // \n\f\n
+        println!("--- PAGE {} START ---", page_idx + 1);
+        println!(); // Blank line
+
+        // Text Layer (Hybrid or Text modes)
+        if args.mode == Mode::Hybrid || args.mode == Mode::Text {
+            println!("--- TEXT LAYER START ---");
+            match renderer.extract_text(&doc, page_idx as i32) {
+                Ok(text) => print!("{}", text), // text likely contains newlines?
+                Err(e) => eprintln!("Warning: Failed to extract text from page {}: {}", page_idx, e),
+            }
+            // Ensure newline at end of text? MuPDF might give it.
+            // If not, we might want one. But let's stick to raw output.
+            println!("--- TEXT LAYER END ---");
+            println!(); // Blank line
         }
-        
-        // Clean up page resources
-        pix.drop_with(&renderer);
+
+        // OCR Layer (Hybrid or Ocr modes)
+        if let Some(ocr_engine) = &ocr {
+             println!("--- OCR LAYER START ---");
+             // Render
+             let mut pix = renderer.render_page(&doc, page_idx as i32, args.dpi as i32)?;
+             // Recognize
+             let text = ocr_engine.recognize(&pix, &renderer)?;
+             print!("{}", text);
+             // Cleanup pix
+             pix.drop_with(&renderer);
+             println!("--- OCR LAYER END ---");
+             println!(); // Blank line
+        }
+
+        println!("--- PAGE {} END ---", page_idx + 1);
+        println!(); // Blank line between pages or after page
     }
     
     // Clean up document

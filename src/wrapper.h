@@ -47,3 +47,10 @@ int my_pixmap_n(fz_context *ctx, fz_pixmap *pix);
 char *my_extract_xfa(fz_context *ctx, fz_document *doc, size_t *len_out,
                      char *err_out, size_t err_len);
 void my_free_xfa(fz_context *ctx, char *xfa_data);
+
+// Text extraction
+// Returns dynamically allocated UTF-8 string, or NULL if no text.
+// Caller must free with my_free_text().
+char *my_extract_text(fz_context *ctx, fz_document *doc, int page_number,
+                      char *err_out, size_t err_len);
+void my_free_text(fz_context *ctx, char *text);

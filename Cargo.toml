@@ -1,6 +1,6 @@
 [package]
 name = "crabocr"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 authors = ["Walid Mahfoudh"]
 description = "High-performance PDF-to-text OCR and Adobe XFA data extractor."

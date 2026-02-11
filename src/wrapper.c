@@ -192,3 +192,76 @@ void my_free_xfa(fz_context *ctx, char *xfa_data) {
   if (ctx && xfa_data)
     fz_free(ctx, xfa_data);
 }
+
+char *my_extract_text(fz_context *ctx, fz_document *doc, int page_number,
+                      char *err_out, size_t err_len) {
+  if (!ctx || !doc)
+    return NULL;
+
+  char *volatile result = NULL;
+
+  fz_try(ctx) {
+    fz_page *page = fz_load_page(ctx, doc, page_number);
+
+    // Create a structured text page
+    fz_stext_page *text_page = fz_new_stext_page(ctx, fz_bound_page(ctx, page));
+
+    // Parse the page for text
+    fz_stext_options opts;
+    memset(&opts, 0, sizeof(opts));
+    // opts.flags = FZ_STEXT_PRESERVE_IMAGES; // If we wanted images, but we
+    // want text.
+
+    // Create a device to extract text
+    fz_device *dev = fz_new_stext_device(ctx, text_page, &opts);
+
+    // Run the page through the device
+    fz_run_page(ctx, page, dev, fz_identity, NULL);
+
+    fz_close_device(ctx, dev);
+    fz_drop_device(ctx, dev);
+
+    // Extract text from the text page to a buffer
+    // fz_print_stext_page_as_text outputs to an output stream.
+    // We want it in a buffer.
+
+    fz_buffer *buf = fz_new_buffer(ctx, 1024);
+    fz_output *out = fz_new_output_with_buffer(ctx, buf);
+
+    fz_print_stext_page_as_text(ctx, out, text_page);
+
+    fz_close_output(ctx, out);
+    fz_drop_output(ctx, out);
+    fz_drop_stext_page(ctx, text_page);
+    fz_drop_page(ctx, page);
+
+    // Get string from buffer
+    unsigned char *data = NULL;
+    size_t len = fz_buffer_extract(ctx, buf, &data);
+    fz_drop_buffer(ctx, buf);
+
+    if (len > 0 && data != NULL) {
+      // Ensure null termination
+      result = fz_malloc(ctx, len + 1);
+      memcpy(result, data, len);
+      result[len] = '\0';
+    } else {
+      // Empty string if no text found, to differentiate from error (NULL)
+      result = fz_malloc(ctx, 1);
+      result[0] = '\0';
+    }
+    fz_free(ctx, data);
+  }
+  fz_catch(ctx) {
+    if (err_out)
+      strncpy(err_out, fz_caught_message(ctx), err_len - 1);
+    return NULL;
+  }
+
+  return result;
+}
+
+void my_free_text(fz_context *ctx, char *text) {
+  if (ctx && text)
+    fz_free(ctx, text);
+}
