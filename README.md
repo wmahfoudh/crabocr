@@ -81,7 +81,7 @@ Options:
 
 ### Example Workflows
 
-**1. Data-Only Extraction (Sub-second)**
+**1. Data-Only Extraction**
 Instantly extract form values as JSON and skip heavy OCR processing.
 
 ```bash
