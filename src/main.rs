@@ -121,13 +121,13 @@ fn run() -> Result<(), CrabError> {
 
     // Execution Loop
     let start_time = Instant::now();
+    let mut timed_out = false;
 
     for &page_idx in &pages_to_process {
         // Timeout handling
         if args.timeout > 0 && start_time.elapsed().as_secs() > args.timeout {
-             std::io::stdout().flush().ok(); // Flush stdout before error
-             eprintln!("Error: Process timed out");
-             process::exit(2);
+             timed_out = true;
+             break;
         }
 
         println!("--- PAGE {} START ---", page_idx + 1);
@@ -166,6 +166,11 @@ fn run() -> Result<(), CrabError> {
     
     // Clean up document
     doc.drop_with(&renderer);
+    
+    if timed_out {
+        std::io::stdout().flush().ok();
+        return Err(CrabError::Timeout);
+    }
     
     Ok(())
 }

@@ -16,6 +16,9 @@ pub enum CrabError {
     
     #[error("Internal Error: {0}")]
     Internal(String), // Exit 5
+
+    #[error("Process timed out")]
+    Timeout, // Exit 2
 }
 
 impl CrabError {
@@ -23,6 +26,7 @@ impl CrabError {
         match self {
             CrabError::Cli(_) => 1,
             CrabError::Input(_) => 2,
+            CrabError::Timeout => 2,
             CrabError::Pdf(_) => 3,
             CrabError::Ocr(_) => 4,
             CrabError::Internal(_) => 5,
