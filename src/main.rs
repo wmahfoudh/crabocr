@@ -152,7 +152,7 @@ fn run() -> Result<(), CrabError> {
              // Render
              let mut pix = renderer.render_page(&doc, page_idx as i32, args.dpi as i32)?;
              // Recognize
-             let text = ocr_engine.recognize(&pix, &renderer)?;
+             let text = ocr_engine.recognize(&pix, &renderer, args.dpi as i32)?;
              print!("{}", text);
              // Cleanup pix
              pix.drop_with(&renderer);
