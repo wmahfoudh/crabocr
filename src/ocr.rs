@@ -26,17 +26,13 @@ struct StderrSilencer {
 }
 
 impl StderrSilencer {
-    fn new() -> Option<Self> {
+    fn new(null_fd: i32) -> Option<Self> {
         let stderr_fd = 2;
         unsafe {
             let original = libc::dup(stderr_fd);
             if original == -1 {
                 return None;
             }
-            
-            let dev_null = std::fs::File::open("/dev/null").ok()?;
-            use std::os::fd::AsRawFd;
-            let null_fd = dev_null.as_raw_fd();
             
             // Redirect stderr to /dev/null
             if libc::dup2(null_fd, stderr_fd) == -1 {
@@ -64,12 +60,20 @@ impl Drop for StderrSilencer {
 
 pub struct Ocr {
     handle: *mut TessBaseAPI,
+    // Keep file open to reuse FD
+    _dev_null: std::fs::File,
 }
 
 impl Ocr {
     pub fn new(lang: &str) -> Result<Self, CrabError> {
+        use std::os::fd::AsRawFd;
+        
+        let dev_null = std::fs::File::open("/dev/null")
+            .map_err(|e| CrabError::Internal(format!("Failed to open /dev/null: {}", e)))?;
+        let null_fd = dev_null.as_raw_fd();
+        
         // Silence entire initialization to catch Leptonica errors
-        let _silencer = StderrSilencer::new();
+        let _silencer = StderrSilencer::new(null_fd);
         
         unsafe {
             let handle = TessBaseAPICreate();
@@ -146,13 +150,17 @@ impl Ocr {
             TessBaseAPISetPageSegMode(handle, psm);
             
             // Silencer drops here efficiently.
-            Ok(Self { handle })
+            Ok(Self { 
+                handle, 
+                _dev_null: dev_null 
+            })
         }
     }
     
     pub fn recognize(&self, pix: &crate::renderer::Pixmap, renderer: &Renderer, dpi: i32) -> Result<String, CrabError> {
+        use std::os::fd::AsRawFd;
         // Silence entire recognition to catch OSD warnings
-        let _silencer = StderrSilencer::new();
+        let _silencer = StderrSilencer::new(self._dev_null.as_raw_fd());
         
         unsafe {
             // Silence everything in recognize to catch 'pixReadMemTiff' from SetImage or Recognize

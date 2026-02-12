@@ -72,10 +72,9 @@ int my_render_page(fz_context *ctx, fz_document *doc, int page_number, int dpi,
     fz_matrix ctm = fz_scale(scale, scale);
 
     // Render
-    // Use RGB (no alpha if possible, but fz_device_rgb returns alpha?)
-    // fz_device_rgb(ctx) returns a colorspace.
-    // We want RGB.
-    *pix_out = fz_new_pixmap_from_page(ctx, page, ctm, fz_device_rgb(ctx), 0);
+    // Use Grayscale (1 byte per pixel) to save memory (75% less than RGBA) and
+    // speed up OCR. Tesseract converts to grayscale internally anyway.
+    *pix_out = fz_new_pixmap_from_page(ctx, page, ctm, fz_device_gray(ctx), 0);
 
     fz_drop_page(ctx, page);
   }
