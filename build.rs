@@ -11,8 +11,7 @@ fn main() {
     println!("cargo:rerun-if-changed={}", vendor_dir.display());
 
     // 1. Build MuPDF
-    // options: build=release HAVE_X11=no HAVE_GLUT=no HAVE_CURL=no
-    // explicit OUT directory to avoid platform-specific suffixes
+    // Build MuPDF with release configuration and disabled external dependencies.
     let build_dir = vendor_dir.join("build/release");
     
     let status = Command::new("make")
@@ -38,10 +37,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static=mupdf");
     println!("cargo:rustc-link-lib=static=mupdf-third");
     
-    // Also linking C++ runtime if needed? MuPDF is mostly C.
-    // However, some parts might use C++.
-    // If we are linking statically, we might need -lm, -ldl etc.
-    // "mupdf-third" usually contains all thirdparty deps.
+    // Link MuPDF and its third-party dependencies.
 
     // 2.5 Compile C Wrapper
     cc::Build::new()
@@ -58,14 +54,14 @@ fn main() {
         .define("BUILD_EXAMPLE", "OFF")
         .define("SW_BUILD", "OFF")
         .define("CMAKE_POLICY_VERSION_MINIMUM", "3.5")
-        // Rigidly disable all image format support to avoid deps
+        // Disable image format support to avoid external dependencies.
         .define("LIBWEBP_SUPPORT", "OFF")
         .define("OPENJPEG_SUPPORT", "OFF")
         .define("CMAKE_DISABLE_FIND_PACKAGE_GIF", "TRUE")
         .define("CMAKE_DISABLE_FIND_PACKAGE_PNG", "TRUE")
         .define("CMAKE_DISABLE_FIND_PACKAGE_TIFF", "TRUE")
         .define("CMAKE_DISABLE_FIND_PACKAGE_ZLIB", "TRUE")
-        .define("CMAKE_DISABLE_FIND_PACKAGE_PkgConfig", "TRUE") // Don't let it find system libs
+        .define("CMAKE_DISABLE_FIND_PACKAGE_PkgConfig", "TRUE") // Prevent finding system libraries.
         .build();
 
     println!("cargo:rustc-link-search=native={}", lept_dst.join("lib").display());
@@ -90,10 +86,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static=tesseract");
     println!("cargo:rustc-link-lib=stdc++"); // Tesseract is C++
 
-    // 5. Generate Bindings (MuPDF + Tesseract)
-    // We already generate MuPDF bindings above. 
-    // We should probably separate them or assume different files.
-    // Let's generate Tesseract bindings separately.
+    // 5. Generate Tesseract Bindings
     
     let tess_bindings = bindgen::Builder::default()
         .header(tess_dst.join("include/tesseract/capi.h").to_str().unwrap())
@@ -124,8 +117,6 @@ fn main() {
         .write_to_file(out_path)
         .expect("Couldn't write bindings!");
         
-    // Standard system libs that might be needed
-    // Usually build.rs doesn't need to specify these if cc handles it, but here we invoke make.
-    // We might need to link math lib.
+    // Link the standard math library.
     println!("cargo:rustc-link-lib=m"); 
 }

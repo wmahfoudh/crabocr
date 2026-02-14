@@ -25,13 +25,10 @@ impl InputSource {
             let stdin = io::stdin();
             let mut handle = stdin.lock();
             
-            // We'll read up to MAX_INMEM_PDF_BYTES + 1 to see if we go over
+            // Read input into a memory buffer. If the size exceeds the limit,
+            // offload to a temporary file.
             let mut buffer = Vec::with_capacity(1024 * 1024); // Start with 1MB capacity
             
-            // Strategy: Read into buffer. If it gets too large, switch to temp file.
-            // But `read_to_end` is easiest for small files.
-            
-            // Let's implement a loop that reads chunks.
             let mut total_read = 0;
             let mut chunk = [0u8; 8192];
             

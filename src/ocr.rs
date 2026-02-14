@@ -20,7 +20,11 @@ mod sys {
 }
 use sys::*;
 
-// Helper for silencing stderr
+// Helper for silencing stderr.
+//
+// Warning: This struct modifies the global file descriptor table (stderr).
+// It is NOT thread-safe. Using this in a multi-threaded environment where
+// other threads write to stderr may result in lost logs.
 struct StderrSilencer {
     original_stderr: i32,
 }
@@ -81,8 +85,7 @@ impl Ocr {
                 return Err(CrabError::Ocr("Failed to create Tesseract handle".into()));
             }
 
-            // --- Configuration Helper ---
-            // We can't define valid closure with FFI easily, so we just use inline calls or a local check.
+            // Helper closure to set Tesseract variables.
             let set_var = |name: &str, val: &str| {
                 let c_name = CString::new(name).unwrap();
                 let c_val = CString::new(val).unwrap();
@@ -117,9 +120,6 @@ impl Ocr {
             let c_lang = CString::new(lang).map_err(|_| CrabError::Input(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid lang string")))?;
 
             // 3. Engine Mode: LSTM_ONLY (1)
-            // We use TessBaseAPIInit2.
-            // 3. Engine Mode: LSTM_ONLY (1)
-            // We use TessBaseAPIInit2.
             let ret = TessBaseAPIInit2(handle, ptr_datapath, c_lang.as_ptr(), TessOcrEngineMode_OEM_LSTM_ONLY);
             
             if ret != 0 {
@@ -130,26 +130,23 @@ impl Ocr {
                 return Err(CrabError::Ocr(format!("Failed to initialize Tesseract with lang '{}' (OEM=LSTM_ONLY)", lang)));
             }
             
-            // 4. Auto-Rotation: PSM_AUTO_OSD (1) or PSM_AUTO (3)
-            // Check if osd.traineddata exists in the resolved tessdata path.
-            // We resolved it to `TESSDATA_PREFIX` env var.
+            // Check if 'osd.traineddata' is available in TESSDATA_PREFIX.
             let psm = if let Ok(prefix) = std::env::var("TESSDATA_PREFIX") {
                 let osd_path = std::path::Path::new(&prefix).join("osd.traineddata");
                 if osd_path.exists() {
                      TessPageSegMode_PSM_AUTO_OSD
                 } else {
-                     // Using println! (stdout) so user sees it even if stderr is silenced
+                     // Print warning to stdout as stderr might be silenced.
                      println!("Warning: 'osd.traineddata' not found in {:?}. Auto-rotation (OSD) disabled. Falling back to PSM_AUTO.", prefix);
                      TessPageSegMode_PSM_AUTO
                 }
             } else {
-                 // Should have been set above, but if not, fallback.
                  TessPageSegMode_PSM_AUTO
             };
             
             TessBaseAPISetPageSegMode(handle, psm);
             
-            // Silencer drops here efficiently.
+            // StderrSilencer is dropped here, restoring stderr.
             Ok(Self { 
                 handle, 
                 _dev_null: dev_null 
@@ -163,8 +160,7 @@ impl Ocr {
         let _silencer = StderrSilencer::new(self._dev_null.as_raw_fd());
         
         unsafe {
-            // Silence everything in recognize to catch 'pixReadMemTiff' from SetImage or Recognize
-            // let _silencer = StderrSilencer::new(); // Removed inner silencer
+            // Silence everything in recognize to catch 'pixReadMemTiff' from SetImage or Recognize.
             
             let width = pix.width(renderer);
             let height = pix.height(renderer);
@@ -183,7 +179,9 @@ impl Ocr {
                  return Err(CrabError::Ocr("Error during recognition".into()));
             }
 
-            // ... Confidence ...
+            // Check confidence score.
+            // Reject output if the mean confidence is below 60 (out of 100).
+            // This filters out noise from empty or garbled pages.
             let mean_conf = TessBaseAPIMeanTextConf(self.handle);
             if mean_conf < 60 {
                 TessBaseAPIClear(self.handle);
@@ -199,7 +197,6 @@ impl Ocr {
             TessDeleteText(text_ptr);
             TessBaseAPIClear(self.handle);
             
-            // Silencer drops here
             Ok(text)
         }
     }

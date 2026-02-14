@@ -15,8 +15,7 @@ typedef struct {
   // ownership managed by fz_pixmap, this struct is just for checking
 } RenderResult;
 
-// Returns NULL on error (message printed to stderr by mupdf default, or we can
-// capture)
+// Returns NULL on error. Error messages are printed to stderr by default.
 fz_context *my_new_context();
 void my_drop_context(fz_context *ctx);
 
