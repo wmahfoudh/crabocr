@@ -31,7 +31,7 @@ pub fn xfa_xml_to_json(xml: &str, data_only: bool) -> Result<String, String> {
                 continue;
             }
             
-            // For data_only mode, if the top element is "Form", we might want to filter its children too
+            // For data_only mode, filter children of the "Form" element.
             if data_only && tag_name == "Form" {
                 if let Value::Object(ref map) = json_val {
                     let mut filtered_map = Map::new();
@@ -77,8 +77,8 @@ fn merge_into_map(map: &mut Map<String, Value>, key: &str, value: Value) {
 fn find_data_section<'a>(doc: &'a Document) -> Option<Node<'a, 'a>> {
     const XFA_DATA_NS: &str = "http://www.xfa.org/schema/xfa-data/1.0/";
     
-    // Strategy 1: Look for xfa:data or datasets/data specific paths
-    // roxmltree doesn't support XPath, so we traverse manually or use descendants.
+    // Look for xfa:data or datasets/data specific paths.
+    // roxmltree doesn't support XPath, so manual traversal is required.
     
     for node in doc.descendants() {
         if !node.is_element() { continue; }
@@ -102,11 +102,7 @@ fn find_data_section<'a>(doc: &'a Document) -> Option<Node<'a, 'a>> {
         }
     }
     
-    // Strategy 2: Fallback - any 'data' element that has children (and isn't the root if root is called data)
-    // We already iterated, but let's be more loose if needed.
-    // The previous loop covers "data" name check.
-    
-    // Strategy 3: Just find ANY usage of "data" tag as a last resort
+    // Fallback: Find any element named "data" as a last resort.
     doc.descendants().find(|n| n.is_element() && n.tag_name().name() == "data")
 }
 
@@ -159,12 +155,11 @@ fn element_to_json(node: Node, data_only: bool) -> Option<Value> {
         }
     }
     
-    // Simplification logic
-    // If only value and no children/attributes -> return value directly?
-    // The requirement says: "Map XML attributes to a _attributes key and text content to a _value key for nodes containing *both* children and raw text."
-    // What if it contains ONLY raw text? usually we want just the string.
+    // Simplification logic:
+    // If the node contains only a value (no children or attributes), return the value directly.
     
     if !has_children && map.len() == 1 && map.contains_key("_value") {
+        // Safe unwrap: we just checked that the key exists.
         return Some(map.remove("_value").unwrap());
     }
     
@@ -195,16 +190,7 @@ fn is_lookup_list(name: &str, value: &Value) -> bool {
         return false;
     }
     
-    // Check structure: Dict with an array > 10 items?
-    // Or just any array > 10 items?
-    /* 
-    Python logic:
-        if isinstance(element_data, dict) and len(element_data) > 0:
-            # Check if it contains array of options
-            for value in element_data.values():
-                if isinstance(value, list) and len(value) > 10:
-                    return True
-    */
+    // Check if the value is an object containing an array with more than 10 items.
     
     if let Value::Object(map) = value {
         for v in map.values() {
@@ -263,45 +249,13 @@ mod tests {
         let json_str = xfa_xml_to_json(&xml, true).unwrap();
         let v: Value = serde_json::from_str(&json_str).unwrap();
         
-        // Should extract it normally if not filtered
-        // Wait, is_lookup_list checks name pattern too. "Dropdown" is in pattern.
-        // It requires an array > 10 inside.
-        // Our xml: MyDropdown -> options -> item (array of 11)
-        // json structure: MyDropdown: { options: { item: [ ... ] } }
-        // "options" value IS an object containing "item" array.
-        // is_lookup_list("options", value_of_options) -> name "options" matches "Options"? Yes.
-        // value_of_options has "item" -> array(11). So yes.
-        
-        // Wait, logic says: "if name matches pattern... if value is dict... if any child is list > 10"
-        
-        // In this case, "MyDropdown" child is "options".
-        // When processing "MyDropdown", we call `element_to_json`. It returns object { options: ... }
-        // Then we check `is_lookup_list("MyDropdown", ...)`. 
-        // "Dropdown" matches.
-        // The value is object { options: { item: [...] } }
-        // We iterate values of this object. "options" is one value. Is "options" an array? No, it's object.
-        // Hmmm the python logic:
-        /*
-        for value in element_data.values():
-             if isinstance(value, list) and len(value) > 10:
-                 return True
-        */
-        // It only checks direct children values.
-        
-        // If XML is: <MyList><item>1</item>...<item>11</item></MyList>
-        // Then MyList -> { item: [1..11] }
-        // is_lookup_list("MyList", obj) -> values includes the array [1..11]. Yes.
-        
-        // So let's test that simpler structure.
+        // Test a simpler structure where the list is direct children.
         let xml2 = format!(r#"<data><MyList>{}</MyList></data>"#, list_items);
          
-        // With data_only=true, it should be skipped and result in empty data error
+        // With data_only=true, it should be skipped and result in empty data error.
         let result = xfa_xml_to_json(&xml2, true);
         assert!(result.is_err());
         assert_eq!(result.err().unwrap(), "No valid data found after extraction");
-        // Since MyList is skipped, and it's the only thing, it might return empty or error?
-        // "No valid data found"
-        // Wait, `xfa_xml_to_json` returns error if empty.
         
         // Let's add a valid field
         let xml3 = format!(r#"<data><MyList>{}</MyList><real>Data</real></data>"#, list_items);

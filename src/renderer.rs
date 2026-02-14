@@ -19,15 +19,7 @@ pub struct Renderer {
 
 pub struct Document {
     doc: *mut fz_document,
-    // Context borrowing logic:
-    // In C, doc depends on ctx. In Rust, we need to ensure ctx lives longer.
-    // Simplifying: internal pointer, careful usage.
-    // Or we can make Document borrow Renderer?
-    // 'a lifetime.
 }
-
-// But wait, fz_document doesn't store ctx usually, operations need ctx passed.
-// So methods on Document need &Renderer (or &mut Renderer).
 
 impl Renderer {
     pub fn new() -> Result<Self, CrabError> {
@@ -86,8 +78,6 @@ impl Renderer {
             Ok(Pixmap { pix })
         }
     }
-    
-    // Safety check helper
     
     /// Extract XFA XML data from the document if present.
     /// Returns None if no XFA data exists.
@@ -157,53 +147,32 @@ impl Drop for Renderer {
 
 impl Drop for Document {
     fn drop(&mut self) {
-        // In this design, Document doesn't own context, so it can't drop itself using context?
-        // Wait, fz_drop_document needs ctx.
-        // If Document drops without context, leak?
-        // This is a common FFI problem.
-        // Solution: wrappers usually hold reference to Context or Context is global?
-        // Or Document drop is no-op if we don't have ctx, but we need to drop it manually?
-        // Better: `Renderer` should drop `Document`.
-        // Or `Document` holds `Rc<Context>` equivalent?
-        // For simplicity: `Document` just holds the pointer, and we add `close_document` to `Renderer`.
-        // Or `unsafe impl Send` and pass `&Renderer`.
-        
-        // Actually, `fz_drop_document` takes `ctx`.
-        // If `Document` is dropped, we can't easily get `ctx` unless we store it.
-        // But `ctx` pointer is `*mut fz_context`.
-        // If `Renderer` is dropped first, `ctx` is invalid.
-        // So `Document` must not outlive `Renderer`.
-        // Lifetimes can enforce this.
-        // But `Drop` trait cannot take arguments.
-        // So we store `ctx` in `Document` too?
-        // Yes, as long as we ensure `Document` lifetime < `Renderer` lifetime.
-        // But raw pointers don't track ownership.
-        
-        // We will store `ctx` in `Document` purely for dropping purposes, 
-        // AND use phantom lifetime to tie it to `Renderer`.
-        // Or just let `Renderer` have `close(doc)` and `Document` having a `dropped` flag?
-        // The safest rust way: `Document<'a>` holds `&'a Renderer`.
-        // But `Drop` implementation cannot have lifetime parameters if struct is generic?
-        // Actually struct can have lifetime.
-        // But if `Renderer` moves, the reference breaks? `Renderer` shouldn't move if pinned.
-        
-        // Alternative: shared ownership of context via `Rc` or `Arc`?
-        // `Renderer` owns context. `Document` holds `Arc<ContextWrapper>`?
-        // Too complex for now.
-        
-        // Pragmatic approach:
-        // `Document` does nothing in Drop? Then we leak.
-        // `Document` stores `ctx`.
-        // We assume `Renderer` outlives `Document`.
+        // Document cleanup is handled manually via `drop_with` because it requires the context.
     }
 }
 
 pub struct Pixmap {
     pix: *mut fz_pixmap,
-    // Needs context to drop? Yes.
-    // Store ctx here too?
 }
 
+/// A wrapper around a MuPDF pixmap.
+///
+/// # Safety
+///
+/// Like `Document`, this struct does not automatically free its C resources on drop
+/// because it needs the context. Use `drop_with` to prevent leaks.
+///
+/// The `samples` method returns a slice backed by C memory. This slice is valid
+/// as long as the `Pixmap` is not dropped/freed.
+/// A wrapper around a MuPDF pixmap.
+///
+/// # Safety
+///
+/// Like `Document`, this struct does not automatically free its C resources on drop
+/// because it needs the context. Use `drop_with` to prevent leaks.
+///
+/// The `samples` method returns a slice backed by C memory. This slice is valid
+/// as long as the `Pixmap` is not dropped/freed.
 impl Pixmap {
     pub fn width(&self, ctx: &Renderer) -> i32 {
         unsafe { my_pixmap_width(ctx.ctx, self.pix) }

@@ -28,7 +28,7 @@ fn run() -> Result<(), CrabError> {
     // Initialize logging
     logging::init(args.verbose);
 
-    // Validate DPI (only needed if OCR is involved? Actually good to validate anyway)
+    // Validate DPI
     if (args.mode == Mode::Ocr || args.mode == Mode::Hybrid) && (args.dpi < 72 || args.dpi > 600) {
         return Err(CrabError::Cli(format!(
             "DPI must be between 72 and 600. Got: {}",
@@ -137,11 +137,10 @@ fn run() -> Result<(), CrabError> {
         if args.mode == Mode::Hybrid || args.mode == Mode::Text {
             println!("--- TEXT LAYER START ---");
             match renderer.extract_text(&doc, page_idx as i32) {
-                Ok(text) => print!("{}", text), // text likely contains newlines?
+                Ok(text) => print!("{}", text),
                 Err(e) => eprintln!("Warning: Failed to extract text from page {}: {}", page_idx, e),
             }
-            // Ensure newline at end of text? MuPDF might give it.
-            // If not, we might want one. But let's stick to raw output.
+            // The text output may contain newlines if the PDF structure suggests them.
             println!("--- TEXT LAYER END ---");
             println!(); // Blank line
         }

@@ -208,8 +208,7 @@ char *my_extract_text(fz_context *ctx, fz_document *doc, int page_number,
     // Parse the page for text
     fz_stext_options opts;
     memset(&opts, 0, sizeof(opts));
-    // opts.flags = FZ_STEXT_PRESERVE_IMAGES; // If we wanted images, but we
-    // want text.
+    // opts.flags = FZ_STEXT_PRESERVE_IMAGES;
 
     // Create a device to extract text
     fz_device *dev = fz_new_stext_device(ctx, text_page, &opts);
@@ -220,9 +219,7 @@ char *my_extract_text(fz_context *ctx, fz_document *doc, int page_number,
     fz_close_device(ctx, dev);
     fz_drop_device(ctx, dev);
 
-    // Extract text from the text page to a buffer
-    // fz_print_stext_page_as_text outputs to an output stream.
-    // We want it in a buffer.
+    // Extract text from the text page to a buffer using an output stream.
 
     fz_buffer *buf = fz_new_buffer(ctx, 1024);
     fz_output *out = fz_new_output_with_buffer(ctx, buf);
