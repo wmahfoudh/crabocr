@@ -7,9 +7,9 @@ Standard PDF parsers often fail on scanned pages, encrypted files, or dynamic Ad
 ## Core Capabilities
 
 *   **Hybrid Extraction**:
-    *   **Text Mode**: Instantly extracts embedded text layers using **MuPDF** (fast, perfect for digital-native PDFs).
+    *   **Text Mode**: Extracts embedded text layers using **MuPDF** (fast, perfect for digital-native PDFs).
     *   **OCR Mode**: Renders pages to high-res images and uses **Tesseract** to recognize text (robust for scans and complex layouts).
-    *   **Hybrid Mode**: Extracts both layers sequentially, providing the ultimate context for RAG pipelines.
+    *   **Hybrid Mode**: Extracts both layers sequentially, providing the best context for LLMs and RAG pipelines.
 *   **Image Support**: Natively processes standalone image files (JPG, PNG, TIFF) in addition to PDFs.
 *   **XFA Data Extraction**: Automatically detects Adobe XFA forms. It extracts raw XML and converts it into a cleaned JSON structure, stripping system metadata and lookup bloat.
 *   **Stateless & Pipe-Friendly**: Reads from `stdin` and writes to `stdout` with strict delimiter formatting. Perfect for containerized environments and Unix-style automation pipelines.
